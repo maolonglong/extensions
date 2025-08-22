@@ -18,8 +18,6 @@ import { useState } from "react";
 type InboxFormValues = {
   new_bullet_title: string;
   new_bullet_note: string;
-  api_key: string;
-  save_location_url: string;
 };
 
 interface Preferences {
@@ -43,11 +41,12 @@ async function submitToWorkflowy(values: InboxFormValues): Promise<void> {
     }),
   });
 
-  const data = await response.json();
-  if (!data || !response.ok) {
-    throw new Error(
-      "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.",
-    );
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const errorMessage =
+      errorData?.error ||
+      "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.";
+    throw new Error(errorMessage);
   }
 }
 
@@ -61,8 +60,7 @@ async function validateWfApiKey(): Promise<void> {
     },
   });
 
-  const data = await response.json();
-  if (!data || !response.ok) {
+  if (!response.ok) {
     throw new Error("Invalid API Key. Set it in the extension preferences and try again.");
   }
 }
@@ -73,13 +71,13 @@ export default function Command(): React.ReactElement {
   const { handleSubmit, itemProps, reset } = useForm<InboxFormValues>({
     async onSubmit(values) {
       if (isLoading) return; // Prevent duplicate submissions
-      
+
       setIsLoading(true);
       showToast({
         style: Toast.Style.Animated,
         title: "Sending to Workflowy...",
       });
-      
+
       try {
         await validateWfApiKey();
         await submitToWorkflowy(values);
@@ -93,7 +91,10 @@ export default function Command(): React.ReactElement {
         showToast({
           style: Toast.Style.Failure,
           title: "Error",
-          message: error instanceof Error ? error.message : "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.",
         });
       } finally {
         setIsLoading(false);
@@ -123,7 +124,7 @@ export default function Command(): React.ReactElement {
           <Action.SubmitForm icon={{ source: "send.svg" }} title="Send and Add Another" onSubmit={handleSubmit} />
           <Action.OpenInBrowser
             icon={{ source: "key.svg" }}
-            title="Get Workflowy API Key"
+            title="Get Workflowy Api Key"
             url="https://workflowy.com/api-key/"
           />
           <Action.OpenInBrowser
