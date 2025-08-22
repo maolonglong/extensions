@@ -13,6 +13,7 @@ import { setTimeout } from "timers/promises";
 import { useForm, FormValidation } from "@raycast/utils";
 import { v4 as uuidv4 } from "uuid";
 import fetch from "cross-fetch";
+import { useState } from "react";
 
 type InboxFormValues = {
   new_bullet_title: string;
@@ -67,8 +68,18 @@ async function validateWfApiKey(): Promise<void> {
 }
 
 export default function Command(): React.ReactElement {
+  const [isLoading, setIsLoading] = useState(false);
+
   const { handleSubmit, itemProps, reset } = useForm<InboxFormValues>({
     async onSubmit(values) {
+      if (isLoading) return; // Prevent duplicate submissions
+      
+      setIsLoading(true);
+      showToast({
+        style: Toast.Style.Animated,
+        title: "Sending to Workflowy...",
+      });
+      
       try {
         await validateWfApiKey();
         await submitToWorkflowy(values);
@@ -78,13 +89,14 @@ export default function Command(): React.ReactElement {
           message: "Added the bullet to your Workflowy inbox.",
         });
         reset();
-      } catch {
+      } catch (error) {
         showToast({
           style: Toast.Style.Failure,
           title: "Error",
-          message:
-            "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.",
+          message: error instanceof Error ? error.message : "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.",
         });
+      } finally {
+        setIsLoading(false);
       }
     },
     validation: {
@@ -95,6 +107,7 @@ export default function Command(): React.ReactElement {
 
   return (
     <Form
+      isLoading={isLoading}
       actions={
         <ActionPanel>
           <Action.SubmitForm
