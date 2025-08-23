@@ -7,9 +7,9 @@ import {
   getPreferenceValues,
   openExtensionPreferences,
   closeMainWindow,
+  popToRoot,
   PopToRootType,
 } from "@raycast/api";
-import { setTimeout } from "timers/promises";
 import { useForm, FormValidation } from "@raycast/utils";
 import { v4 as uuidv4 } from "uuid";
 import fetch from "cross-fetch";
@@ -104,6 +104,41 @@ export default function Command(): React.ReactElement {
       new_bullet_title: FormValidation.Required,
     },
   });
+
+  // Separate handler for "Send and Close" that doesn't reset the form
+  const handleSubmitAndClose = async (values: InboxFormValues) => {
+    if (isLoading) return; // Prevent duplicate submissions
+
+    setIsLoading(true);
+    showToast({
+      style: Toast.Style.Animated,
+      title: "Sending to Workflowy...",
+    });
+
+    try {
+      await validateWfApiKey();
+      await submitToWorkflowy(values);
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Success!",
+        message: "Added the bullet to your Workflowy inbox.",
+      });
+      // Don't reset the form here - just close the window immediately like Obsidian
+      popToRoot();
+      await closeMainWindow({ popToRootType: PopToRootType.Immediate });
+    } catch (error) {
+      showToast({
+        style: Toast.Style.Failure,
+        title: "Error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to submit the bullet to Workflowy. Please check your API key and save location url and then try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const { saveLocationUrl } = getPreferenceValues<Preferences>();
 
   return (
@@ -111,16 +146,7 @@ export default function Command(): React.ReactElement {
       isLoading={isLoading}
       actions={
         <ActionPanel>
-          <Action.SubmitForm
-            icon={{ source: "send.svg" }}
-            title="Send and Close"
-            onSubmit={async (values) => {
-              await handleSubmit(values as InboxFormValues);
-              // This allows the success message to show for a second before closing the window.
-              await setTimeout(1000);
-              await closeMainWindow({ popToRootType: PopToRootType.Immediate });
-            }}
-          />
+          <Action.SubmitForm icon={{ source: "send.svg" }} title="Send and Close" onSubmit={handleSubmitAndClose} />
           <Action.SubmitForm icon={{ source: "send.svg" }} title="Send and Add Another" onSubmit={handleSubmit} />
           <Action.OpenInBrowser
             icon={{ source: "key.svg" }}
